@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lite Land Manual · Reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=JetBrains+Mono:wght@400;500;700&family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap">
+<link rel="icon" type="image/png" href="img/brand/lite_land_64.png">
+<link rel="apple-touch-icon" href="img/brand/lite_land_180.png">
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html"><img class="brand-mark" src="img/brand/lite_land_64.png" alt="" width="26" height="26"><span>Lite Land <span class="brand-sub">Manual</span></span></a>
+  <nav class="parts" aria-label="Manual parts">
+    <a href="index.html"><span>A</span>Getting started</a>
+    <a href="concepts.html"><span>B</span>How it works</a>
+    <a href="workflow.html"><span>C</span>Workflow</a>
+    <a href="reference.html" aria-current="page"><span>D</span>Reference</a>
+  </nav>
+</div></header>
+
+<div class="frame">
+<aside class="toc" aria-label="On this page">
+  <p class="toc-title">Part D · Reference</p>
+  <ol>
+    <li><a href="#files"><span class="n">11</span>Workspaces and files</a>
+      <ol>
+        <li><a href="#folder">The workspace folder</a></li>
+        <li><a href="#reload">Reopening a workspace</a></li>
+      </ol>
+    </li>
+    <li><a href="#params"><span class="n">12</span>Parameter guide</a></li>
+    <li><a href="#trouble"><span class="n">13</span>Troubleshooting</a></li>
+    <li><a href="#limits"><span class="n">14</span>Known limits</a></li>
+    <li><a href="#glossary"><span class="n">15</span>Glossary</a></li>
+    <li><a href="#refs"><span class="n">16</span>References</a></li>
+  </ol>
+</aside>
+
+<main>
+<section class="hero">
+  <p class="eyebrow">Part D · Reference</p>
+  <h1>Reference</h1>
+  <p class="lead">Files Lite Land writes, every adjustable setting, what the console's messages mean, and the terms used in this manual.</p>
+</section>
+
+<h2 id="files"><span class="num">11</span>Workspaces, outputs and file formats</h2>
+<h3 id="folder">The workspace folder</h3>
+<p>Each orthomosaic gets its own workspace folder, named after the image and placed beside it. The folder is created the first time you save the workspace or the points, or run an assessment.</p>
+<div class="tree" role="figure" aria-label="Workspace folder contents"><span class="d">data/</span>
+├── Ortho_sample.tif
+├── DSM_sample.tif
+└── <span class="d">Ortho_sample_workspace/</span>
+    ├── session.json                 <span class="c">settings, file paths, classes, training samples</span>
+    ├── segments.tif                 <span class="c">segment ID of every pixel</span>
+    ├── segments.gpkg                <span class="c">segment polygons</span>
+    ├── segment_features.csv         <span class="c">the 19 or 23 features of every segment</span>
+    ├── classified_map.npy           <span class="c">last classification, before the sieve</span>
+    ├── Ortho_sample_classified.tif  <span class="c">exported map (Export Final Classified TIF)</span>
+    ├── Ortho_sample_classified.qml  <span class="c">QGIS style for the exported map</span>
+    ├── accuracy_points.gpkg         <span class="c">reference points and their labels</span>
+    └── accuracy_report.csv          <span class="c">confusion matrix and accuracies</span></div>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>File</th><th>Written by</th><th>Format</th><th>Open with</th></tr></thead>
+  <tbody>
+    <tr><td><code>session.json</code></td><td>Save Workspace</td><td>JSON text</td><td>Lite Land (Load Workspace); any text editor</td></tr>
+    <tr><td><code>segments.tif</code></td><td>Save Workspace</td><td>GeoTIFF, 1 band, int32, 0 = no data</td><td>QGIS, ArcGIS</td></tr>
+    <tr><td><code>segments.gpkg</code></td><td>Save Workspace</td><td>GeoPackage polygons, field <code>raster_val</code> = segment ID</td><td>QGIS, ArcGIS</td></tr>
+    <tr><td><code>segment_features.csv</code></td><td>Save Workspace</td><td>CSV, one row per segment, index <code>raster_val</code></td><td>Excel, R, Python</td></tr>
+    <tr><td><code>classified_map.npy</code></td><td>Save Workspace</td><td>NumPy array, class index per pixel</td><td>Lite Land; Python</td></tr>
+    <tr><td><code>*_classified.tif</code></td><td>Export Final Classified TIF</td><td>GeoTIFF, 1 band, uint8, colour table; 0 = no data, 1… = classes in list order</td><td>QGIS, ArcGIS</td></tr>
+    <tr><td><code>*_classified.qml</code></td><td>Export Final Classified TIF</td><td>QGIS layer style: class names and colours</td><td>QGIS (loads automatically beside the .tif)</td></tr>
+    <tr><td><code>accuracy_points.gpkg</code></td><td>Save Points, Save Workspace, Run Accuracy Assessment</td><td>GeoPackage points: <code>point_id</code>, <code>reference_class</code>, <code>predicted_class</code>, <code>source</code></td><td>QGIS, ArcGIS</td></tr>
+    <tr><td><code>accuracy_report.csv</code></td><td>Run Accuracy Assessment</td><td>CSV: matrix with totals, User's and Producer's accuracy, overall accuracy, sample size, source note</td><td>Excel</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="reload">Reopening a workspace</h3>
+<ul>
+  <li><strong>With the orthomosaic already loaded:</strong> click <span class="ui">Load Workspace</span>; Lite Land reads that image's workspace folder.</li>
+  <li><strong>From a fresh start:</strong> click <span class="ui">Load Workspace</span> on Tab 1 and pick the workspace folder. Lite Land reopens the recorded orthomosaic and DSM and resamples them to the saved resolution.</li>
+  <li><strong>If files have moved,</strong> Lite Land asks you to locate them.</li>
+</ul>
+<p><span class="ui">Reset and Return to Loading</span> on Tab 2 clears the session in memory and returns to Tab 1. It does not delete anything on disk.</p>
+
+<h2 id="params"><span class="num">12</span>Parameter guide</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Setting</th><th>Tab</th><th>Range</th><th>Default</th><th>Raise it when…</th><th>Lower it when…</th></tr></thead>
+  <tbody>
+    <tr><td>Resample Scale</td><td>1</td><td class="mono">5–100%</td><td class="mono">100%</td><td>Detail is lost or objects blur together</td><td>Segments outline leaves; GPU runs out of memory; runs are slow</td></tr>
+    <tr><td>Target Resolution</td><td>1</td><td class="mono">native–20× native</td><td class="mono">native</td><td colspan="2">Same as Resample Scale, in cm/px. Projected coordinate systems only.</td></tr>
+    <tr><td>Num Segments</td><td>1</td><td class="mono">100–100,000</td><td class="mono">5,000</td><td>Segments mix two classes; small features have no segment of their own</td><td>Uniform areas are shattered into slivers</td></tr>
+    <tr><td>Compactness</td><td>1</td><td class="mono">0.01–1.00</td><td class="mono">0.15</td><td>Segments are too irregular or stringy</td><td>Segments cut straight across visible edges</td></tr>
+    <tr><td>Sigma</td><td>1</td><td class="mono">0–10</td><td class="mono">2.5</td><td>Outlines are ragged; a grid or diagonal pattern appears</td><td>Small features are smoothed away</td></tr>
+    <tr><td>Elevation opacity</td><td>1</td><td class="mono">0–100%</td><td class="mono">60%</td><td colspan="2">Display only; no effect on results.</td></tr>
+    <tr><td>Grow Tolerance</td><td>2</td><td class="mono">0–3.00</td><td class="mono">1.00</td><td>Growth stops short of a uniform area</td><td>Growth leaks into different ground</td></tr>
+    <tr><td>Opacity (blend)</td><td>2</td><td class="mono">0–100%</td><td class="mono">100%</td><td colspan="2">Display only.</td></tr>
+    <tr><td>MMU (px)</td><td>2</td><td class="mono">0–2,000</td><td class="mono">0</td><td>The map is too speckled for its use</td><td>Small real features disappear</td></tr>
+    <tr><td>Points to Add</td><td>3</td><td class="mono">1–20,000</td><td class="mono">200</td><td>Rare classes have fewer than ~30 points</td><td>—</td></tr>
+  </tbody>
+</table></div>
+<h3>Starting values</h3>
+<div class="table-wrap"><table>
+  <thead><tr><th>Situation</th><th>Resolution</th><th>Num Segments</th><th>Compactness · Sigma</th></tr></thead>
+  <tbody>
+    <tr><td>This sample (22 ha)</td><td class="mono">10 cm</td><td class="mono">8,000</td><td class="mono">0.15 · 2.5</td></tr>
+    <tr><td>Forest gaps and crowns, tens of hectares</td><td class="mono">10–25 cm</td><td class="mono">5,000–20,000</td><td class="mono">0.15 · 2.5</td></tr>
+    <tr><td>Very large mosaics (100+ ha)</td><td class="mono">20–25 cm</td><td class="mono">raise with area</td><td class="mono">0.15 · 2.5</td></tr>
+  </tbody>
+</table></div>
+<p class="small">These come from runs on the sample and on tropical forest surveys of up to about 150 ha. Treat them as starting points and judge each segmentation by eye (<a href="workflow.html#segment">Part C, 7</a>).</p>
+
+<h2 id="trouble"><span class="num">13</span>Troubleshooting</h2>
+<p>Most problems announce themselves in the console. Search this table for the message you see.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>You see</th><th>Why</th><th>Do this</th></tr></thead>
+  <tbody>
+    <tr><td>The <span class="ui">GPU</span> option is greyed out</td><td>No CUDA-capable NVIDIA GPU was found</td><td>Use CPU. Segmentation is slower (about 10× on the sample) but gives equivalent results.</td></tr>
+    <tr><td><code>GPU SLIC failed (…). Falling back to traditional CPU SLIC</code></td><td>Usually the GPU ran out of memory</td><td>Let the CPU run finish, or resample to a coarser resolution and segment again on GPU.</td></tr>
+    <tr><td><code>Please select a target class from the list panel before collecting samples.</code></td><td>No class is active</td><td>Click a class in the list, then click objects.</td></tr>
+    <tr><td>Clicks select in cyan instead of labelling</td><td>Selection Mode is on</td><td>Click <span class="ui">Selection Mode: ON</span> to turn it off.</td></tr>
+    <tr><td><code>Training Error: Select samples for at least two classes first.</code></td><td>Fewer than two classes have samples</td><td>Add samples to at least two classes.</td></tr>
+    <tr><td><code>Classification Error: Train the classifier model first.</code></td><td>Classify was clicked before Train, or after a new segmentation</td><td>Click <span class="ui">Train Classifier</span> first.</td></tr>
+    <tr><td><code>Merge Denied: Select at least two segments first</code></td><td>Fewer than two objects selected</td><td>Turn on Selection Mode and select the pieces.</td></tr>
+    <tr><td>Training samples vanished</td><td>A resample or new segmentation cleared them (they belong to old segments)</td><td>Expected. Resample and segment first, then label. Save the workspace before experimenting.</td></tr>
+    <tr><td>Grow selection spills into roads or roofs</td><td>Tolerance too high; growth follows any similar neighbour</td><td>Lower the tolerance; seed several clicks at low tolerance instead.</td></tr>
+    <tr><td>Two similar-looking classes are confused (roof vs. canopy, dirt vs. concrete)</td><td>Too few or too clustered samples</td><td>Add samples of each across the scene; load a DSM so height and slope help.</td></tr>
+    <tr><td>Long thin segments along the image edge</td><td>Large empty margins in a rotated orthomosaic</td><td>Ignore them, or don't sample them. Crop the margins in GIS before loading if they matter.</td></tr>
+    <tr><td><code>Export Error: Run classification first.</code></td><td>Nothing classified yet</td><td>Train and classify, then export.</td></tr>
+    <tr><td>CSV import stops listing class names</td><td>Class names in the CSV don't exactly match Tab 2</td><td>Fix spelling and capitalisation in the CSV, or rename the class in Tab 2.</td></tr>
+    <tr><td><code>… points are still unassigned — they'll be excluded from this run</code></td><td>Some reference points have no label</td><td>Label them, delete the ones you cannot judge, or accept the smaller sample.</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="limits"><span class="num">14</span>Known limits</h2>
+<ul>
+  <li><strong>RGB only.</strong> There is no near-infrared band, so no NDVI. Visible-light indices, texture and height do that job.</li>
+  <li><strong>One scene at a time.</strong> A model trained on one flight is not automatically valid for another; light and season change colours. Normalise radiometry outside Lite Land before reusing samples across flights.</li>
+  <li><strong>GPU memory caps scene size.</strong> Resample large mosaics.</li>
+  <li><strong>Segmentation is parameter-sensitive.</strong> Results depend on Num Segments, compactness and sigma; record the values you used (they are saved in <code>session.json</code>).</li>
+  <li><strong>Photo-interpreted reference is not ground truth.</strong> Report it as reference data.</li>
+</ul>
+
+<h2 id="glossary"><span class="num">15</span>Glossary</h2>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><th>Adjacency graph</th><td>The list of which segments share a border. Used by the grow tool, merging and the neighbour features.</td></tr>
+    <tr><th>CIELAB</th><td>A colour space in which equal distances look like equal colour differences. SLIC clusters in it.</td></tr>
+    <tr><th>Confusion matrix</th><td>A table of map class (rows) against reference class (columns) for a set of points. Also called an error matrix.</td></tr>
+    <tr><th>DSM</th><td>Digital Surface Model: height of the top surface, including trees and roofs. Not the bare ground.</td></tr>
+    <tr><th>Feature</th><td>One measured property of a segment, such as mean green or slope. Lite Land uses 19, or 23 with a DSM.</td></tr>
+    <tr><th>GLCM</th><td>Grey-level co-occurrence matrix: a tally of how often grey levels sit next to each other. The source of the texture features.</td></tr>
+    <tr><th>GSD</th><td>Ground sample distance: the ground width of one pixel, e.g. 8 cm.</td></tr>
+    <tr><th>MMU</th><td>Minimum mapping unit: the smallest patch the map keeps. Set by the sieve.</td></tr>
+    <tr><th>OBIA</th><td>Object-based image analysis: classifying groups of pixels (objects) rather than single pixels.</td></tr>
+    <tr><th>Orthomosaic</th><td>A geometrically corrected mosaic of drone photos, with map coordinates.</td></tr>
+    <tr><th>Overall accuracy</th><td>Share of all reference points the map labels correctly.</td></tr>
+    <tr><th>Producer's accuracy</th><td>For one class: share of its reference points the map found. Measures omission.</td></tr>
+    <tr><th>Random Forest</th><td>A classifier made of many decision trees, each trained on a random resample, that vote.</td></tr>
+    <tr><th>Reference data</th><td>Labels used to check a map. Photo-interpreted reference is distinct from field-verified ground truth.</td></tr>
+    <tr><th>Resample</th><td>Change the pixel size of an image, here by averaging to a coarser grid.</td></tr>
+    <tr><th>Segment / object</th><td>A connected group of similar pixels produced by segmentation. The unit Lite Land classifies.</td></tr>
+    <tr><th>Sieve</th><td>A filter that absorbs patches below a size into their surroundings.</td></tr>
+    <tr><th>SLIC</th><td>Simple Linear Iterative Clustering: the segmentation algorithm Lite Land uses.</td></tr>
+    <tr><th>Training sample</th><td>A segment you labelled to teach the classifier.</td></tr>
+    <tr><th>User's accuracy</th><td>For one class: share of the points the map puts in that class that really belong to it. Measures commission.</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="refs"><span class="num">16</span>References</h2>
+<p>The methods in this manual (SLIC, the vegetation indices, GLCM texture, Random Forest, and accuracy assessment practice) are described with full citations in the project summary, <code>references/OBIA_Software_For_Aerial_Imgery_Summary.md</code>, in the PyOBIA project folder.</p>
+<p>The figures and every number in this manual are rebuilt by the scripts in <code>docs/manual/tools</code> from <code>data/Ortho_sample.tif</code> and <code>data/DSM_sample.tif</code>. See <code>docs/manual/tools/README.md</code>.</p>
+
+<nav class="pager" aria-label="Previous part">
+  <a href="workflow.html"><span class="k">← Part C</span><b>Workflow, tab by tab</b></a>
+</nav>
+</main>
+</div>
+<footer class="foot">Lite Land User Manual · by LeoBar.</footer>
+<script src="manual_data.js"></script>
+<script src="manual.js"></script>
+</body>
+</html>

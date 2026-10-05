@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lite Land Manual · How it works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=JetBrains+Mono:wght@400;500;700&family=Public+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap">
+<link rel="icon" type="image/png" href="img/brand/lite_land_64.png">
+<link rel="apple-touch-icon" href="img/brand/lite_land_180.png">
+<link rel="stylesheet" href="manual.css">
+</head>
+<body>
+<header class="topbar"><div class="topbar-inner">
+  <a class="brand" href="index.html"><img class="brand-mark" src="img/brand/lite_land_64.png" alt="" width="26" height="26"><span>Lite Land <span class="brand-sub">Manual</span></span></a>
+  <nav class="parts" aria-label="Manual parts">
+    <a href="index.html"><span>A</span>Getting started</a>
+    <a href="concepts.html" aria-current="page"><span>B</span>How it works</a>
+    <a href="workflow.html"><span>C</span>Workflow</a>
+    <a href="reference.html"><span>D</span>Reference</a>
+  </nav>
+</div></header>
+
+<div class="frame">
+<aside class="toc" aria-label="On this page">
+  <p class="toc-title">Part B · How it works</p>
+  <ol>
+    <li><a href="#objects"><span class="n">5.1</span>Objects, not pixels</a></li>
+    <li><a href="#slic"><span class="n">5.2</span>Segmentation with SLIC</a></li>
+    <li><a href="#features"><span class="n">5.3</span>The object fingerprint</a>
+      <ol>
+        <li><a href="#feature-table">All 23 features</a></li>
+        <li><a href="#explorer">Feature explorer</a></li>
+        <li><a href="#glcm">Texture, step by step</a></li>
+        <li><a href="#context">Context and height</a></li>
+      </ol>
+    </li>
+    <li><a href="#rf"><span class="n">5.4</span>Random Forest</a></li>
+    <li><a href="#retraining"><span class="n">5.5</span>Why retraining matters</a></li>
+    <li><a href="#sieve"><span class="n">5.6</span>Generalisation</a></li>
+    <li><a href="#accuracy"><span class="n">5.7</span>Accuracy assessment</a></li>
+  </ol>
+</aside>
+
+<main>
+<section class="hero">
+  <p class="eyebrow">Part B · Concepts</p>
+  <h1>How Lite Land works</h1>
+  <p class="lead">Lite Land reads a drone image the way a person does. It splits the scene into objects, describes each object with 19 measurements (23 with a DSM), and learns from your examples which descriptions belong to which class.</p>
+</section>
+
+<h2 id="objects"><span class="num">5.1</span>Objects, not pixels</h2>
+<p>Object-based image analysis classifies groups of similar neighbouring pixels instead of single pixels. A group carries far more evidence than a pixel: its average colour, how varied it is inside, its texture, its shape, its height and how it compares with its neighbours. It also removes the scattered single-pixel speckle that pixel-by-pixel maps suffer from.</p>
+<div class="strip c3">
+  <figure><img src="img/obj_pixels.jpg" alt="Pool, roofs and canopy at 10 cm"><figcaption><b>Pixels</b> 10 cm each. A single pixel says little.</figcaption></figure>
+  <figure><img src="img/obj_boundaries.jpg" alt="Same view with yellow segment outlines"><figcaption><b>Segments</b> Groups that share colour and position.</figcaption></figure>
+  <figure><img src="img/obj_means.jpg" alt="Same view with each segment filled with its mean colour"><figcaption><b>Objects</b> Each now has one colour, one texture, one shape.</figcaption></figure>
+</div>
+<p>At drone resolution a tree crown or roof spans hundreds of pixels, so objects match real things on the ground. Resolution can also be too fine. Below roughly 1–5 cm per pixel the segmenter starts outlining individual leaves and branches, and objects stop meaning anything. About 5–10 cm per pixel suits crown- and gap-scale work. The sample is captured at 8 cm and processed at 10 cm.</p>
+<div class="note"><p><strong>RGB only.</strong> Consumer drone cameras record red, green and blue, with no near-infrared. That rules out NDVI, so Lite Land leans on visible-light vegetation indices, texture and height instead.</p></div>
+
+<h2 id="slic"><span class="num">5.2</span>Segmentation with SLIC</h2>
+<p>SLIC (Simple Linear Iterative Clustering) is k-means clustering on five numbers per pixel: three colour values in CIELAB space (L*, a*, b*) and the pixel's x and y. Seeds start on a regular grid. Each pixel then joins the nearest seed, where "near" mixes colour and distance:</p>
+<p class="mono" style="font-size:18px;background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:16px 20px;text-align:center">D = √( d<sub>colour</sub>² + (d<sub>space</sub> / S)² · m² )</p>
+<p><em>S</em> is the seed spacing and <em>m</em> is <strong>compactness</strong>. CIELAB is used because distances in it track how different two colours look to a person. After about ten rounds of moving seeds and reassigning pixels, a clean-up pass makes every segment a single connected piece.</p>
+
+<h3>Number of segments: the scale of the map</h3>
+<p>This one setting decides how big objects are, and it is the most important choice in OBIA. Too many, and crowns and roofs are cut into fragments (more labelling, but edges are kept). Too few, and objects straddle two cover types, which no classifier can fix.</p>
+<div class="strip c3">
+  <figure><img src="img/seg_k2000.jpg" alt="Segments at 2,000 target"><figcaption><b>2,000</b> <span data-d="seg_series.k2000.segments" data-fmt="int"></span> objects. Roofs merge with paving.</figcaption></figure>
+  <figure><img src="img/seg_k8000.jpg" alt="Segments at 8,000 target"><figcaption><b>8,000 (used here)</b> <span data-d="seg_series.k8000.segments" data-fmt="int"></span> objects, ~<span data-d="segmentation.mean_area_m2" data-fmt="f0"></span> m² each.</figcaption></figure>
+  <figure><img src="img/seg_k30000.jpg" alt="Segments at 30,000 target"><figcaption><b>30,000</b> <span data-d="seg_series.k30000.segments" data-fmt="int"></span> objects. Roofs split into many tiles.</figcaption></figure>
+</div>
+
+<h3>Compactness and sigma</h3>
+<p><strong>Compactness</strong> trades colour against regularity: low values let segments follow colour edges closely; high values make them blocky and even. <strong>Sigma</strong> blurs the image slightly before clustering so that fine texture and sensor noise do not seed spurious segments.</p>
+<div class="strip c4">
+  <figure><img src="img/seg_m005.jpg" alt="Compactness 0.05"><figcaption><b>Compactness 0.05</b> Follows edges, irregular sizes.</figcaption></figure>
+  <figure><img src="img/seg_m050.jpg" alt="Compactness 0.5"><figcaption><b>Compactness 0.5</b> Regular, cuts across weak edges.</figcaption></figure>
+  <figure><img src="img/seg_s0.jpg" alt="Sigma 0"><figcaption><b>Sigma 0</b> No smoothing: ragged outlines.</figcaption></figure>
+  <figure><img src="img/seg_s6.jpg" alt="Sigma 6"><figcaption><b>Sigma 6</b> Heavy smoothing: rounder, softer.</figcaption></figure>
+</div>
+<p class="caption">All four use 8,000 segments; compare with the 8,000 panel above (compactness 0.15, sigma 2.5).</p>
+<details class="why"><summary>GPU and CPU give slightly different segments</summary>
+<p>The CPU engine is scikit-image's standard SLIC, which searches only a window around each seed. The GPU engine is a PyTorch version that does the same clustering on the graphics card. The two treat compactness on different numeric scales, so the same slider value gives similar but not identical segments. On the sample, 8,000 requested segments gave <span data-d="seg_series.k8000.segments" data-fmt="int"></span> on GPU and <span data-d="seg_series.cpu_k8000.segments" data-fmt="int"></span> on CPU. Pick one engine for a project and keep it.</p>
+</details>
+
+<h2 id="features"><span class="num">5.3</span>The object fingerprint</h2>
+<p>Once segmented, every object is summarised by a fixed list of numbers. These numbers, not the image, are what the classifier learns from. Nineteen come from the RGB image alone; a DSM adds four more.</p>
+
+<h3 id="feature-table">All 23 features</h3>
+<div class="table-wrap"><table>
+  <thead><tr><th>Group</th><th>Feature</th><th>What it measures</th><th>Helps separate</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="3">Colour</td><td><code>r_mean</code> <code>g_mean</code> <code>b_mean</code></td><td>Average of each band</td><td>Overall colour; dark shade and gaps</td></tr>
+    <tr><td><code>r_std</code> <code>g_std</code> <code>b_std</code></td><td>Spread of each band inside the object</td><td>Ragged crown vs. lawn or roof</td></tr>
+    <tr><td><code>brightness_mean</code></td><td>Average of (R+G+B)/3</td><td>Sunlit vs. shaded surfaces</td></tr>
+    <tr><td rowspan="3">Vegetation index</td><td><code>exg_mean</code></td><td>Excess Green, 2g − r − b</td><td>Plants vs. soil, roads, roofs</td></tr>
+    <tr><td><code>vari_mean</code></td><td>(G − R) / (G + R − B)</td><td>Green cover, damped for light</td></tr>
+    <tr><td><code>ngrdi_mean</code></td><td>(G − R) / (G + R)</td><td>Greenness, NDVI stand-in</td></tr>
+    <tr><td rowspan="4">Texture (GLCM)</td><td><code>contrast</code></td><td>Grey-level difference between neighbours</td><td>Canopy vs. smooth roof</td></tr>
+    <tr><td><code>homogeneity</code></td><td>Closeness of neighbouring grey levels</td><td>Uniform surfaces</td></tr>
+    <tr><td><code>energy</code></td><td>Orderliness (angular second moment)</td><td>Repetitive surfaces</td></tr>
+    <tr><td><code>entropy</code></td><td>Disorder of the texture</td><td>Complex canopy</td></tr>
+    <tr><td rowspan="3">Shape</td><td><code>area</code> <code>perimeter</code></td><td>Size of the outline, m² and m</td><td>Object size</td></tr>
+    <tr><td><code>circularity</code></td><td>4πA / P²; 1 is a disc</td><td>Compact vs. long objects</td></tr>
+    <tr><td><code>convexity</code></td><td>Area / convex-hull area</td><td>Regular vs. ragged outlines</td></tr>
+    <tr><td>Context</td><td><code>brightness_rel_neighbors</code></td><td>Own brightness minus touching objects' mean</td><td>Locally dark patches, gaps</td></tr>
+    <tr><td rowspan="3">Height (DSM)</td><td><code>dsm_mean</code> <code>dsm_std</code></td><td>Mean height and its spread</td><td>Tall vs. low; rough canopy</td></tr>
+    <tr><td><code>slope_mean</code></td><td>Mean slope in degrees</td><td>Tilted roofs and crown sides vs. flat ground</td></tr>
+    <tr><td><code>dsm_rel_neighbors</code></td><td>Own mean height minus touching objects' mean</td><td>Raised objects (crowns, roofs) vs. sunken (gaps, roads)</td></tr>
+  </tbody>
+</table></div>
+<p>The three vegetation indices use chromatic coordinates, each band divided by R + G + B, so that a shaded leaf and a sunlit leaf score alike.</p>
+
+<h3 id="explorer">Feature explorer</h3>
+<p>Pick a feature to see its value for every object in one 128 × 96 m patch of the sample. The patch holds all five classes: trees on the left and centre, the sports field top right, roads, roofs bottom left and earthworks bottom right.</p>
+<div class="panel" id="feature-explorer" data-start="exg_mean">
+  <div class="fx">
+    <div class="fx-list"></div>
+    <div class="fx-view"></div>
+  </div>
+</div>
+<p class="small">Colour ramps are stretched to the 2nd–98th percentile of objects in this patch. The neighbour features use a blue–red ramp centred on zero.</p>
+
+<h3 id="glcm">Texture, step by step</h3>
+<p>Texture comes from a <strong>grey-level co-occurrence matrix</strong> (GLCM). The object is turned to grey, reduced to 15 grey levels, and every pair of touching pixels is tallied by its two levels, in four directions. A smooth surface puts all its pairs on the diagonal (same level next to same level). A busy one scatters them.</p>
+<div class="glcm">
+  <div class="glcm-card" data-glcm="canopy">
+    <h4>A canopy object</h4>
+    <figure style="margin:0"><img src="img/glcm_canopy.png" alt="A canopy segment outlined in magenta"><figcaption>Outlined object</figcaption></figure>
+    <div><div class="glcm-grid" aria-label="Co-occurrence matrix of the canopy object"></div><p class="small" style="margin-top:4px">Co-occurrence: spread wide</p></div>
+    <dl class="glcm-stats"></dl>
+  </div>
+  <div class="glcm-card" data-glcm="roof">
+    <h4>A roof object</h4>
+    <figure style="margin:0"><img src="img/glcm_roof.png" alt="A roof segment outlined in magenta"><figcaption>Outlined object</figcaption></figure>
+    <div><div class="glcm-grid" aria-label="Co-occurrence matrix of the roof object"></div><p class="small" style="margin-top:4px">Co-occurrence: one cell</p></div>
+    <dl class="glcm-stats"></dl>
+  </div>
+</div>
+<p style="margin-top:18px">Teal and green roofs can look close to canopy in mean colour. Texture separates them at once: the canopy's contrast is hundreds of times the roof's. Objects smaller than 16 pixels get neutral texture values.</p>
+<details class="why"><summary>Exactly how Lite Land computes texture</summary>
+<p>Luminance is 0.299R + 0.587G + 0.114B. Grey levels 1–15 hold the object's pixels; level 0 marks pixels outside the object and is dropped, then the matrix is renormalised so only pairs inside the object count. Pairs are one pixel apart at 0°, 45°, 90° and 135°, counted symmetrically. Contrast, homogeneity and energy are averaged over the four directions. Entropy is computed in bits and summed over the four directions, so its values run about four times a single-direction entropy; the classifier is unaffected by that scale.</p>
+</details>
+
+<h3 id="context">Context and height</h3>
+<p>Two features compare each object with the objects it touches, using a <strong>region adjacency graph</strong> (a list of which objects share a border). An object darker and lower than everything around it is a canopy-gap candidate wherever it sits on a slope. That matters on hilly ground, where a hilltop gap can be higher than valley-floor canopy, and where no bare-earth terrain model exists to subtract.</p>
+<div class="strip c3">
+  <figure><img src="img/dsm_crop.jpg" alt="DSM heights over the patch"><figcaption><b>DSM</b> <span data-d="dsm_crop.lo" data-fmt="f0"></span>–<span data-d="dsm_crop.hi" data-fmt="f0"></span> m. Terrain and objects mixed together.</figcaption></figure>
+  <figure><img src="img/slope_crop.jpg" alt="Slope over the patch"><figcaption><b>Slope</b> 0–60°. Crown sides and roof edges light up.</figcaption></figure>
+  <figure><img src="img/feat/dsm_rel_neighbors.jpg" alt="Height relative to neighbours per object"><figcaption><b>Height vs neighbours</b> Red: higher than its neighbours. Blue: lower.</figcaption></figure>
+</div>
+<p>Random Forest needs no rescaling of these features, so they go in as measured. The grow-selection tool on Tab 2 compares objects by distance, so it first divides each feature by its spread across the scene.</p>
+
+<h2 id="rf"><span class="num">5.4</span>Random Forest</h2>
+<p>You label a modest number of example objects per class. Lite Land trains a <strong>Random Forest</strong> of 100 decision trees on their feature lists and asks it to label every object in the scene.</p>
+<figure class="wide">
+<svg viewBox="0 0 1060 290" role="img" aria-label="Many trees, each trained on a random resample, vote on every object" style="width:100%;height:auto;font-family:'Public Sans',sans-serif">
+  <defs><marker id="ra" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#44504a"/></marker></defs>
+  <text x="8" y="22" font-family="Archivo, sans-serif" font-weight="700" font-size="16" fill="#17201c">Many trees, each trained on a random resample, vote on every object</text>
+  <g font-size="12.5" fill="#44504a">
+    <rect x="8" y="52" width="190" height="200" rx="10" fill="#fff" stroke="#44504a"/>
+    <text x="22" y="78" font-weight="700" fill="#17201c" font-family="Archivo, sans-serif" font-size="15">Training objects</text>
+    <text x="22" y="98">your labelled examples,</text><text x="22" y="114">each a row of 23 numbers</text>
+    <g><rect x="22" y="132" width="10" height="10" rx="2" fill="#1f7a3c"/><rect x="38" y="132" width="132" height="10" rx="2" fill="#eef3ef"/></g>
+    <g><rect x="22" y="150" width="10" height="10" rx="2" fill="#a3cf4f"/><rect x="38" y="150" width="132" height="10" rx="2" fill="#eef3ef"/></g>
+    <g><rect x="22" y="168" width="10" height="10" rx="2" fill="#c99358"/><rect x="38" y="168" width="132" height="10" rx="2" fill="#eef3ef"/></g>
+    <g><rect x="22" y="186" width="10" height="10" rx="2" fill="#8b9099"/><rect x="38" y="186" width="132" height="10" rx="2" fill="#eef3ef"/></g>
+    <g><rect x="22" y="204" width="10" height="10" rx="2" fill="#d64541"/><rect x="38" y="204" width="132" height="10" rx="2" fill="#eef3ef"/></g>
+    <text x="22" y="238" fill="#76817b">… 340 rows in the example</text>
+  </g>
+  <g fill="none" stroke="#44504a" stroke-width="1.25"><path d="M198 152H236" marker-end="url(#ra)"/><path d="M606 152H644" marker-end="url(#ra)"/><path d="M842 152H880" marker-end="url(#ra)"/></g>
+  <g font-size="12" fill="#44504a">
+    <g transform="translate(244,52)"><rect width="110" height="200" rx="10" fill="#fff" stroke="#44504a"/><text x="55" y="26" text-anchor="middle" font-weight="700" fill="#17201c" font-family="Archivo, sans-serif" font-size="14">Tree 1</text><path d="M55 52v20M55 72L30 100M55 72L80 100M30 100L18 128M30 100L42 128M80 100L92 128" stroke="#44504a" fill="none"/><circle cx="55" cy="52" r="5" fill="#44504a"/><text x="55" y="160" text-anchor="middle">ExG &gt; 0.12?</text><text x="55" y="178" text-anchor="middle">slope &lt; 9°?</text></g>
+    <g transform="translate(366,52)"><rect width="110" height="200" rx="10" fill="#fff" stroke="#44504a"/><text x="55" y="26" text-anchor="middle" font-weight="700" fill="#17201c" font-family="Archivo, sans-serif" font-size="14">Tree 2</text><path d="M55 52v20M55 72L30 100M55 72L80 100M80 100L68 128M80 100L92 128" stroke="#44504a" fill="none"/><circle cx="55" cy="52" r="5" fill="#44504a"/><text x="55" y="160" text-anchor="middle">contrast &gt; 1.1?</text><text x="55" y="178" text-anchor="middle">b_mean &gt; 140?</text></g>
+    <g transform="translate(488,52)"><rect width="110" height="200" rx="10" fill="#fff" stroke="#44504a" stroke-dasharray="4 4"/><text x="55" y="26" text-anchor="middle" font-weight="700" fill="#17201c" font-family="Archivo, sans-serif" font-size="14">… Tree 100</text><path d="M55 52v20M55 72L30 100M55 72L80 100M30 100L18 128M30 100L42 128" stroke="#44504a" fill="none"/><circle cx="55" cy="52" r="5" fill="#44504a"/><text x="55" y="160" text-anchor="middle">each sees a random</text><text x="55" y="178" text-anchor="middle">subset of features</text></g>
+  </g>
+  <g font-size="12.5" fill="#44504a">
+    <rect x="652" y="52" width="190" height="200" rx="10" fill="#fff" stroke="#44504a"/>
+    <text x="666" y="78" font-weight="700" fill="#17201c" font-family="Archivo, sans-serif" font-size="15">One object's votes</text>
+    <rect x="666" y="98" width="120" height="16" rx="3" fill="#1f7a3c"/><text x="794" y="111">71</text>
+    <rect x="666" y="122" width="34" height="16" rx="3" fill="#a3cf4f"/><text x="708" y="135">20</text>
+    <rect x="666" y="146" width="10" height="16" rx="3" fill="#c99358"/><text x="684" y="159">6</text>
+    <rect x="666" y="170" width="5" height="16" rx="3" fill="#8b9099"/><text x="679" y="183">3</text>
+    <text x="666" y="226" fill="#76817b">illustrative counts</text>
+  </g>
+  <g font-size="12.5" fill="#44504a">
+    <rect x="888" y="98" width="164" height="108" rx="10" fill="#e3efe7" stroke="#1f7a3c" stroke-width="2"/>
+    <text x="970" y="140" text-anchor="middle" font-weight="700" fill="#17201c" font-family="Archivo, sans-serif" font-size="16">Trees</text>
+    <text x="970" y="162" text-anchor="middle">majority wins</text>
+  </g>
+  <text x="425" y="280" text-anchor="middle" font-size="12" fill="#76817b">the questions inside each tree are learned from the data; those shown are examples</text>
+</svg>
+</figure>
+<p>Why this and not hand-written rules such as "brightness below 50 means gap"? Rules are clear but brittle: a change in light breaks them, and they do not scale to 23 features and five classes. A Random Forest learns the combinations for you. Training each tree on a random resample of your examples, with a random subset of features at each split, keeps it from memorising noise.</p>
+
+<h2 id="retraining"><span class="num">5.5</span>Why retraining matters</h2>
+<p>The first model rarely gets every class right. It mislabels objects unlike anything in your first examples. Every classification run shows you exactly where those errors are, and <strong>retraining</strong> fixes them: add the misclassified objects as samples under their correct class, train again, classify again. Repeating this removes most of the misclassified objects you can see.</p>
+<div class="compare" data-label="Compare a sparse first model with the final model">
+  <img src="img/sparse_zoom.png" alt="Classification from a first model trained on 5 objects per class, with scattered errors">
+  <div class="top"><img src="img/full_zoom.png" alt="The same area classified by the final model trained on 340 objects, much cleaner"></div>
+  <div class="bar"></div><span class="tag l">First model · <span data-d="sparse_example.samples"></span> objects</span><span class="tag r">Final model · <span data-d="training.total"></span> objects</span>
+</div>
+<p class="caption" style="margin-top:8px">Drag across the image. A first model trained on five objects per class scatters Building and Impervious across the earthworks and field edge; the final model keeps them Bare.</p>
+
+<div class="demo">
+  <p class="tagline">Simulated from the sample session · not a recorded history</p>
+  <p>The sample session keeps only its final training set, not the order it was built in. To show how accuracy grows round by round, we <strong>replayed the retraining loop</strong> from those real labels. Round 1 trains on <span data-d="simulation.start_per_class"></span> randomly chosen objects per class. Each later round adds up to <span data-d="simulation.add_per_class"></span> objects per class that the current model gets wrong, drawn from the session's own 340 labelled objects, which is what you do after inspecting a run. Every round is scored against the session's 100 reference points. The replay was repeated from <span data-d="simulation.seeds"></span> different random starts.</p>
+</div>
+<div class="panel">
+  <p class="chart-title">Overall accuracy by retraining round</p>
+  <p class="chart-sub">Mean of <span data-d="simulation.seeds"></span> replays (line) and their range (bars). Share of the 100 reference points the map labels correctly.</p>
+  <div class="chart" id="chart-oa"></div>
+  <details class="chart-table"><summary>Show as table</summary>
+    <div class="table-wrap"><table><thead><tr><th>Round</th><th class="num">Training objects (mean)</th><th class="num">Overall accuracy (mean)</th><th class="num">Range</th></tr></thead><tbody></tbody></table></div>
+  </details>
+</div>
+<p><strong>The first rounds matter most.</strong> Accuracy climbs from <span data-d="simulation.rounds.0.oa_mean" data-fmt="pct0"></span> on 25 objects to <span data-d="simulation.rounds.2.oa_mean" data-fmt="pct0"></span> by round 3, then levels off near <span data-d="simulation.rounds.7.oa_mean" data-fmt="pct0"></span>. Later rounds still add samples, but each fixes less.</p>
+<p><strong>Targeted samples beat sheer numbers.</strong> The replays reach the final model's <span data-d="simulation.final_full.oa" data-fmt="pct0"></span> with about <span data-d="simulation.rounds.7.samples" data-fmt="int"></span> objects, chosen because the model got them wrong. The session's full set of <span data-d="training.total"></span> objects scores no higher. Objects the model already gets right add little.</p>
+<p><strong>Start-up luck fades.</strong> In round 1 the replays range from <span data-d="simulation.rounds.0.oa_min" data-fmt="pct0"></span> to <span data-d="simulation.rounds.0.oa_max" data-fmt="pct0"></span>, depending on which five objects per class happened to be picked. By the last rounds every replay sits within a few points of the others.</p>
+<div class="panel">
+  <p class="chart-title">Producer's accuracy per class, first model and final model</p>
+  <p class="chart-sub">Share of each class's 20 reference points the map got right. Round 1 is the mean of the replays.</p>
+  <div class="chart" id="chart-pa"></div>
+</div>
+<p>Impervious gains the most: a five-object start cannot cover asphalt, concrete paving and dark paths at once. Trees are found from the start; tree canopy is the most distinctive class in colour, texture and height.</p>
+<div class="note"><p><strong>The rule that follows:</strong> after each run, do not just fix the most visible blotch. Pan the whole scene, list the <em>kinds</em> of mistakes, and add a few samples of each kind from several places. Then measure with the Accuracy tab rather than by eye.</p></div>
+<div class="strip c3">
+  <figure><img src="img/sim_round_1.png" alt="Classified map after simulated round 1"><figcaption><b>Round 1</b> 25 objects.</figcaption></figure>
+  <figure><img src="img/sim_round_3.png" alt="Classified map after simulated round 3"><figcaption><b>Round 3</b></figcaption></figure>
+  <figure><img src="img/sim_round_8.png" alt="Classified map after simulated round 8"><figcaption><b>Round 8</b></figcaption></figure>
+</div>
+<p class="caption">One of the replays, whole scene. Watch the field, the earthworks and the roads settle.</p>
+
+<h2 id="sieve"><span class="num">5.6</span>Generalisation</h2>
+<p>Even a good map has isolated objects labelled differently from everything around them. The <strong>sieve</strong> removes connected patches of one class smaller than a pixel threshold and hands them to the surrounding class. This sets a <strong>minimum mapping unit</strong> without blurring real boundaries, because it only ever moves whole small patches.</p>
+<div class="compare" data-label="Compare no sieve with a 2,000-pixel sieve">
+  <img src="img/sieve_0.png" alt="Classification with no sieve">
+  <div class="top"><img src="img/sieve_2000.png" alt="Classification after a 2,000-pixel sieve"></div>
+  <div class="bar"></div><span class="tag l">No sieve</span><span class="tag r">Sieve 2,000 px (20 m²)</span>
+</div>
+<div class="table-wrap"><table>
+  <thead><tr><th class="num">Sieve (px)</th><th class="num">Area at 10 cm (m²)</th><th class="num">Map pixels changed</th><th class="num">Overall accuracy</th></tr></thead>
+  <tbody id="sieve-table"></tbody>
+</table></div>
+<p>Segments at 10 cm average about <span data-d="segmentation.mean_area_m2" data-fmt="f0"></span> m² (around <span data-d="segmentation.mean_area_px" data-fmt="int"></span> pixels), so a sieve below roughly 1,400 pixels changes nothing: every patch is already bigger. The sample session used a sieve between 1,500 and 2,000 px. It tidied 0.6% of the map and cost one reference point. Set the sieve for how the map will be used, not to raise the score.</p>
+
+<h2 id="accuracy"><span class="num">5.7</span>Accuracy assessment</h2>
+<p>A map is only as useful as your knowledge of how wrong it is. Lite Land follows standard remote-sensing practice (Congalton and Green):</p>
+<ul>
+  <li><strong>An independent sample.</strong> Points are scattered by simple random sampling over the whole image, not by the map's own classes, so the check does not depend on the model it checks. Training objects are kept out.</li>
+  <li><strong>Blind labelling.</strong> You label each point on the raw image, with the classification hidden, so the model's answer cannot sway you.</li>
+  <li><strong>A confusion matrix.</strong> Rows are what the map says; columns are what the reference says. The diagonal holds agreements.</li>
+</ul>
+<div class="table-wrap"><table>
+  <thead><tr><th>Measure</th><th>Question it answers</th><th>From the matrix</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Overall accuracy</strong></td><td>What share of all points is right?</td><td>Diagonal total ÷ all points</td></tr>
+    <tr><td><strong>User's accuracy</strong></td><td>If the map says Grass, how often is it really Grass? (reliability for a map user)</td><td>Diagonal ÷ row total</td></tr>
+    <tr><td><strong>Producer's accuracy</strong></td><td>Of the real Grass, how much did the map find? (completeness for the map maker)</td><td>Diagonal ÷ column total</td></tr>
+  </tbody>
+</table></div>
+<p>Kappa is left out on purpose; current guidance favours these three measures. The worked matrix for the sample is in <a href="workflow.html#acc-read">Part C, 10.4</a>.</p>
+<div class="note"><p><strong>Equal points per class, or random?</strong> A simple random sample puts points where the classes are, so overall accuracy estimates the whole map. A sample with the same number of points per class, like the sample session's 20 each, gives every class enough points for a fair per-class score, but over-weights rare classes in overall accuracy. In the sample, Trees cover <span data-d="map_share.Trees" data-fmt="pct0"></span> of the map but hold 20% of the points. Report overall accuracy from an equal-per-class sample as a per-class summary, not as the map-wide figure.</p></div>
+<div class="warn"><p><strong>Reference data is not ground truth.</strong> Points you label by eye from the orthomosaic are high-confidence <em>reference data</em>. Only points checked on the ground are <em>ground truth</em>. Lite Land's report records which source each point came from and says so in its footnote.</p></div>
+
+<nav class="pager" aria-label="Previous and next part">
+  <a href="index.html"><span class="k">← Part A</span><b>Getting started</b></a>
+  <a class="next" href="workflow.html"><span class="k">Part C →</span><b>Workflow, tab by tab</b></a>
+</nav>
+</main>
+</div>
+<footer class="foot">Lite Land User Manual · by LeoBar · references for the methods on this page are listed in the project summary (<code>references/OBIA_Software_For_Aerial_Imgery_Summary.md</code>).</footer>
+<script src="manual_data.js"></script>
+<script src="manual.js"></script>
+</body>
+</html>
