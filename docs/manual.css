@@ -28,7 +28,7 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-padding-top: 76px; }
+html { scroll-padding-top: 130px; }
 body {
   margin: 0;
   background: var(--paper);
@@ -78,12 +78,29 @@ kbd {
 .parts a[aria-current="page"] { background: var(--ink); color: var(--paper); }
 .parts a[aria-current="page"] span { color: var(--mark); }
 
+/* download bar, pinned with the top bar (matches Lite Flight's) */
+.getbar { background: var(--ink); color: #fff; }
+.getbar-in { max-width: 1320px; margin: 0 auto; padding: 6px 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.getbar-id { min-width: 0; display: grid; gap: 2px; }
+.getbar p { margin: 0; font-size: 14px; line-height: 1.3; }
+.getbar p b { font-family: var(--f-display); font-stretch: 88%; font-size: 19px; font-weight: 750; letter-spacing: .01em; }
+.getbar p span { color: #b9c3bd; }
+.getbar-contact { font-size: 13px !important; color: #b9c3bd; }
+.getbar-contact a { color: #fff; text-decoration-color: rgba(255, 255, 255, .45); }
+.getbar-contact a:hover { color: #fff; text-decoration-color: #fff; }
+.getbar-btn { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; flex: none;
+  background: #f46a45; color: #fff; text-decoration: none; font-weight: 650; font-size: 14.5px; padding: 8px 15px; border-radius: 8px; }
+.getbar-btn:hover { background: #d9532f; color: #fff; }
+.getbar-btn svg { width: 16px; height: 16px; }
+.getbar a:focus-visible { outline-color: #fff; }
+.topbar { padding-top: 0; }
+
 /* ---------- page frame ---------- */
 .frame {
   max-width: 1320px; margin: 0 auto; padding-inline: 16px; padding-block: 0 80px;
   display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px;
 }
-.toc { position: sticky; top: 78px; align-self: start; max-height: calc(100vh - 96px); overflow: auto; padding-top: 40px; }
+.toc { position: sticky; top: 132px; align-self: start; max-height: calc(100vh - 150px); overflow: auto; padding-top: 40px; }
 .toc-title {
   font-family: var(--f-display); font-stretch: 85%; font-weight: 700; font-size: 12px;
   letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px;
@@ -339,6 +356,9 @@ footer.foot { max-width: 1320px; margin: 0 auto; padding: 24px 16px 40px; border
   .fx { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 700px) {
+  .getbar-in { padding: 6px 12px; }
+  .getbar .long, .getbar p span, .getbar-contact .sep { display: none; }
+  .getbar-contact { font-size: 12px !important; }
   body { font-size: 15.5px; }
   .parts { margin-left: 0; }
   .parts a { padding: 5px 8px; font-size: 13px; }

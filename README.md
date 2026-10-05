@@ -10,7 +10,7 @@ It splits the image into objects, describes each object with up to 23 measuremen
 
 ## Download
 
-Get the trial, `LiteLand_Trial_v1.3.zip` (about 2 GB), from the [Releases page](https://github.com/leobarua/liteland/releases/latest), which links to the download. Unzip the whole folder and run `LiteLand_Trial.exe`; no installation, Python or GIS software needed. Windows 10/11, 64-bit.
+**[Download the trial: LiteLand_Trial_v1.3.zip (2.2 GB, Google Drive)](https://drive.google.com/file/d/1JxOnxnY069Mfg6nPAA1eiSF7T0b4u91c/view?usp=drive_link)** Unzip the whole folder and run `LiteLand_Trial.exe`; no installation, Python or GIS software needed. Windows 10/11, 64-bit.
 
 | | Trial | Full version |
 | --- | --- | --- |

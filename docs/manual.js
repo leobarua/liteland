@@ -47,7 +47,7 @@
   var links = Array.prototype.slice.call(document.querySelectorAll(".toc a[href^='#']"));
   var targets = links.map(function (a) { return document.getElementById(a.getAttribute("href").slice(1)); });
   function spy() {
-    var y = window.scrollY + 120, cur = -1;
+    var y = window.scrollY + 160, cur = -1;
     targets.forEach(function (t, i) { if (t && t.getBoundingClientRect().top + window.scrollY <= y) cur = i; });
     links.forEach(function (a, i) { a.classList.toggle("active", i === cur); });
   }
